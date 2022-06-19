@@ -1,11 +1,13 @@
 # Network Device Discovery
-A tool for discovering devices on the local network
+A tool for discovering devices on the local network.
+
+Currently this tool only works on Windows.
 
 ![screenshot](https://github.com/computermadscientist/network_device_discovery/blob/main/resources/screenshot_001.png)
 
 ## Installation
 
-Requires Python 3 installed. 
+Requires Python 3.9+ installed. 
 You can download the latest version of Python 3 via the [official website](https://www.python.org/downloads/)
 
 Once Python has been installed, ensure you have the Python library dependencies installed.
