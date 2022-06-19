@@ -7,12 +7,15 @@ import re
 import socket
 import subprocess
 
+from pprint import pprint
+
 import requests
 from colorama import Fore, init as colorama_init
 
 B = Fore.BLUE
 C = Fore.CYAN
 G = Fore.GREEN
+M = Fore.MAGENTA
 R = Fore.RED
 RE = Fore.RESET
 W = Fore.WHITE
@@ -39,10 +42,11 @@ def print_status(code, clear_screen=False, device={}):
                     {C}▒▓█▓▒                             ▒▓█▓▒{RE}⠀⠀
             """,
         "not_windows": f"{R}[-] {RE}Please run NDD.py on a Windows machine",
-        "scanning": f"{G}Scanning for local network devices ...{RE}",
+        "scanning_arp": f"{G}Scanning for local network devices using {Y}ARP {G}...{RE}",
+        "scanning_upnp": f"{G}Scanning for local network devices using {Y}UPNP {G}...{RE}",
         "device_table_headers": f"""
-        ID         Interface              IPv4 address           MAC address              Vendor
-        ---        ---------------        ---------------        -----------------        ---------------
+        ID    Interface         IPv4 address      MAC address         Vendor                         UPNP Locations
+        ---   ---------------   ---------------   -----------------   ---------------                ---------------
         """,
     }
 
@@ -63,6 +67,31 @@ def get_arp_table():
     arp_table_split = arp_table_output.split("\n")
     arp_table = [line.strip() for line in arp_table_split]
     return arp_table
+
+def get_upnp_locations():
+    locations = set()
+    location_regex = re.compile("location:[ ]*(.+)\r\n", re.IGNORECASE)
+    ssdpDiscover = ('M-SEARCH * HTTP/1.1\r\n' +
+                    'HOST: 239.255.255.250:1900\r\n' +
+                    'MAN: "ssdp:discover"\r\n' +
+                    'MX: 1\r\n' +
+                    'ST: ssdp:all\r\n' +
+                    '\r\n')
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.sendto(ssdpDiscover.encode('ASCII'), ("239.255.255.250", 1900))
+    sock.settimeout(3)
+    try:
+        while True:
+            data, addr = sock.recvfrom(1024) # buffer size is 1024 bytes
+            location_result = location_regex.search(data.decode('ASCII'))
+            if location_result and (location_result.group(1) in locations) == False:
+                locations.add(location_result.group(1))
+    except socket.error:
+        sock.close()
+
+    return locations
+    # return upnp_locations
 
 
 def process_arp_table(arp_table):
@@ -94,6 +123,7 @@ def process_arp_table(arp_table):
                         "mac": device_mac,
                         "vendor": device_vendor,
                         "interface": interface_addr,
+                        "upnp_locations": [],
                     }
                 }
             )
@@ -123,19 +153,58 @@ def main():
     ctypes.windll.kernel32.SetConsoleTitleW("Network Device Discovery")
 
     print_status("banner", clear_screen=True)
-    print_status("scanning")
+    print_status("scanning_arp")
 
     arp_table = get_arp_table()
     devices_found = process_arp_table(arp_table)
 
-    print_status("banner", clear_screen=True)
+    print_status("scanning_upnp")
+
+    upnp_locations = get_upnp_locations()
+
+    # TODO
+    # put UPNP location/device processing in it's own function
+    for u in upnp_locations:
+        d = re.search(r'\/\/(.*):', u).group(1)
+
+        if d not in devices_found:
+            devices_found.update(
+                {
+                    d: {
+                        "num": "",
+                        "address": d,
+                        "mac": "",
+                        "vendor": "",
+                        "interface": "",
+                        "upnp_locations": [],
+                    }
+                }
+            )
+        else: 
+            devices_found[d]["upnp_locations"].append(u)
+
+    # print_status("banner", clear_screen=True)
     print_status("device_table_headers")
 
+    # TODO
+    # This was quick and dirty to test formatting, clean-up
     for device in devices_found.values():
-        print(
-            f'        {B}{device["num"]:<11}{W}{device["interface"]:<23}{C}{device["address"]:<23}{Y}{device["mac"]:<25}{G}{device["vendor"]}'
+        if len(device["upnp_locations"]) == 0:
+            print(
+                f'        {C}{device["num"]:<6}{W}{device["interface"]:<19}{C}{device["address"]:<18}{Y}{device["mac"]:<20}{G}{device["vendor"]:<30}{M}{"":<25}'
+            )
+        elif len(device["upnp_locations"]) == 1:
+            print(
+                f'        {C}{device["num"]:<6}{W}{device["interface"]:<19}{C}{device["address"]:<18}{Y}{device["mac"]:<20}{G}{device["vendor"]:<30}{M}{device["upnp_locations"][0]:<25}'
+            )
+        elif len(device["upnp_locations"]) > 1:
+            print(
+                f'        {C}{device["num"]:<6}{W}{device["interface"]:<19}{C}{device["address"]:<18}{Y}{device["mac"]:<20}{G}{device["vendor"]:<30}{M}{device["upnp_locations"][0]:<25}'
+            )
+            for d in device["upnp_locations"][1:]:
+                print(
+            f'                                                                                                     {M}{d:<25}'
         )
-
 
 if __name__ == "__main__":
     main()
