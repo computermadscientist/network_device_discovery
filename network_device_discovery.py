@@ -157,12 +157,14 @@ def lookup_mac_addr_oui(mac_addr):
 def combine_devices_found(arp_devices_found, upnp_devices_found):
     # TODO
     # There should be a simpler way to do this
-    for device_addr in arp_devices_found:
-        arp_devices_found[device_addr]["upnp_locations"] = upnp_devices_found.get(
+    devices_found = arp_devices_found.copy()
+
+    for device_addr in devices_found:
+        devices_found[device_addr]["upnp_locations"] = upnp_devices_found.get(
             device_addr, {}
         ).get("upnp_locations", [])
 
-    return arp_devices_found
+    return devices_found
 
 
 def main():
@@ -192,7 +194,7 @@ def main():
 
     # TODO
     # This was quick and dirty to test formatting, clean-up
-    for device in arp_devices_found.values():
+    for device in devices_found.values():
         if len(device["upnp_locations"]) == 0:
             print(
                 f'{C}{device["num"]:<6}{W}{device["interface"]:<19}{C}{device["address"]:<18}{Y}{device["mac"]:<20}{G}{device["vendor"]:<30}{M}{"":<25}'
