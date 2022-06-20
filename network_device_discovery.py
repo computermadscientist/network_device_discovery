@@ -6,11 +6,12 @@ import os
 import re
 import socket
 import subprocess
-
+import xml.etree.ElementTree as ET
 from pprint import pprint
 
 import requests
-from colorama import Fore, init as colorama_init
+from colorama import Fore
+from colorama import init as colorama_init
 
 B = Fore.BLUE
 C = Fore.CYAN
@@ -27,8 +28,12 @@ regex_mac_addr = re.compile(r"(.{2}-.{2}-.{2}-.{2}-.{2}-.{2})")
 regex_arp_interface = re.compile(r"Interface: (.+?) ---")
 regex_upnp_location = re.compile("location:[ ]*(.+)\r\n", re.IGNORECASE)
 
+xml_urn_schema = (
+    "./{urn:schemas-upnp-org:device-1-0}device/{urn:schemas-upnp-org:device-1-0}"
+)
 
-def print_status(code, clear_screen=False, device={}):
+
+def print_status(code, clear_screen=False):
     status_switch = {
         "banner": f"""{G}
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡾⠃⠀⠀⠀⠀⠀⠀⠰⣶⡀⠀⠀
@@ -45,8 +50,8 @@ def print_status(code, clear_screen=False, device={}):
         "not_windows": f"{R}[-] {RE}Please run NDD.py on a Windows machine",
         "scanning_arp": f"{G}Scanning for local network devices using {Y}ARP {G}...{RE}",
         "scanning_upnp": f"{G}Scanning for local network devices using {Y}UPNP {G}...{RE}",
-        "device_table_headers": f"{'ID':<6}{'Interface':<19}{'IPv4 address':<18}{'MAC address':<20}{'Vendor':<30}{'UPNP Locations':<25}\n"
-        + f"{'---':<6}{'---------------':<19}{'---------------':<18}{'-----------------':<20}{'-----------------------':<30}{'-----------------------':<25}",
+        "device_table_headers": f"{'ID':<6}{'Interface':<19}{'IPv4 address':<18}{'MAC address':<20}{'Vendor':<30}\n"
+        + f"{'---':<6}{'---------------':<19}{'---------------':<18}{'-----------------':<20}{'-----------------------':<30}",
     }
 
     if clear_screen:
@@ -69,7 +74,7 @@ def get_arp_table():
 
 
 def get_upnp_locations():
-    locations = set()
+    upnp_locations = set()
     ssdpDiscover = (
         "M-SEARCH * HTTP/1.1\r\n"
         + "HOST: 239.255.255.250:1900\r\n"
@@ -86,12 +91,15 @@ def get_upnp_locations():
         while True:
             data, addr = sock.recvfrom(1024)  # buffer size is 1024 bytes
             location_result = regex_upnp_location.search(data.decode("ASCII"))
-            if location_result and (location_result.group(1) in locations) == False:
-                locations.add(location_result.group(1))
+            if (
+                location_result
+                and (location_result.group(1) in upnp_locations) == False
+            ):
+                upnp_locations.add(location_result.group(1))
     except socket.error:
         sock.close()
 
-    return locations
+    return upnp_locations
 
 
 def process_upnp_locations(upnp_locations):
@@ -167,6 +175,51 @@ def combine_devices_found(arp_devices_found, upnp_devices_found):
     return devices_found
 
 
+def parse_xml_attribute(xml, xml_name):
+    try:
+        temp = xml.find(xml_name).text
+        return temp
+    except AttributeError:
+        return ""
+
+
+def get_upnp_location_data(upnp_location):
+    device_data = {}
+
+    resp = requests.get(upnp_location, timeout=2)
+    if resp.headers.get("server"):
+        device_data["Server String"] = resp.headers["server"]
+
+    try:
+        xmlRoot = ET.fromstring(resp.text)
+    except:
+        return device_data
+
+    device_data["Device Type"] = parse_xml_attribute(
+        xmlRoot, f"{xml_urn_schema}deviceType"
+    )
+    device_data["Friendly Name"] = parse_xml_attribute(
+        xmlRoot, f"{xml_urn_schema}friendlyName"
+    )
+    device_data["Manufacturer"] = parse_xml_attribute(
+        xmlRoot, f"{xml_urn_schema}manufacturer"
+    )
+    device_data["Manufacturer URL"] = parse_xml_attribute(
+        xmlRoot, f"{xml_urn_schema}manufacturerURL"
+    )
+    device_data["Model Description"] = parse_xml_attribute(
+        xmlRoot, f"{xml_urn_schema}modelDescription"
+    )
+    device_data["Model Name"] = parse_xml_attribute(
+        xmlRoot, f"{xml_urn_schema}modelName"
+    )
+    device_data["Model Number"] = parse_xml_attribute(
+        xmlRoot, f"{xml_urn_schema}modelNumber"
+    )
+
+    return device_data
+
+
 def main():
     colorama_init(convert=True)
 
@@ -193,24 +246,27 @@ def main():
     print_status("device_table_headers")
 
     # TODO
-    # This was quick and dirty to test formatting, clean-up
+    # Clean-up
+    # Determine better layout as more info is added
     for device in devices_found.values():
-        if len(device["upnp_locations"]) == 0:
-            print(
-                f'{C}{device["num"]:<6}{W}{device["interface"]:<19}{C}{device["address"]:<18}{Y}{device["mac"]:<20}{G}{device["vendor"]:<30}{M}{"":<25}'
-            )
-        elif len(device["upnp_locations"]) == 1:
-            print(
-                f'{C}{device["num"]:<6}{W}{device["interface"]:<19}{C}{device["address"]:<18}{Y}{device["mac"]:<20}{G}{device["vendor"]:<30}{M}{device["upnp_locations"][0]:<25}'
-            )
-        elif len(device["upnp_locations"]) > 1:
-            print(
-                f'{C}{device["num"]:<6}{W}{device["interface"]:<19}{C}{device["address"]:<18}{Y}{device["mac"]:<20}{G}{device["vendor"]:<30}{M}{device["upnp_locations"][0]:<25}'
-            )
-            for d in device["upnp_locations"][1:]:
-                print(
-                    f"                                                                                             {M}{d:<25}"
-                )
+
+        print(
+            f'{C}{device["num"]:<6}{W}{device["interface"]:<19}{C}{device["address"]:<18}{Y}{device["mac"]:<20}{G}{device["vendor"]:<30}'
+        )
+
+        already_printed = False
+
+        if device["upnp_locations"]:
+            print(f'{" "*63}{W}UPNP Locations')
+            print(f'{" "*63}{W}------------------------')
+            print(f'{" "*63}{M}{", ".join(device["upnp_locations"])}')
+
+            for l in device["upnp_locations"]:
+                upnp_data = get_upnp_location_data(l)
+                if upnp_data and not already_printed:
+                    for key, value in upnp_data.items():
+                        print(f"{M}{key:>61}: {G}{value}")
+                        already_printed = True
 
 
 if __name__ == "__main__":
