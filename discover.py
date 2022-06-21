@@ -1,4 +1,4 @@
-# A tool to perform network device discovery using Python
+# A Python script to perform network device discovery using ARP, UPNP
 
 import ctypes
 import json
@@ -33,7 +33,7 @@ xml_urn_schema = (
 )
 
 
-def print_status(code, clear_screen=False):
+def print_status(code, clear_screen=False) -> None:
     status_switch = {
         "banner": f"""{G}
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡾⠃⠀⠀⠀⠀⠀⠀⠰⣶⡀⠀⠀
@@ -43,14 +43,14 @@ def print_status(code, clear_screen=False):
 ⠀⠀⠀⠀⠀⠀⠀⠀⠈⢿⣄⠘⠃⠀{C}⢸⡇{G}⠀⠘⠁⣰⡟⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠃⠀⠀{C}⢸⡇{G}⠀⠀⠘⠋⠀⠀⠀ 
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⢸⡇░░░▒▒▓██████████████████████████{G}█{C}█{G}█{C}█{Y}█{C}█{G}█{C}██▓▒▒░░░{G}
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⢸⡇░░░▒▒▓█  {W}Network Device Discovery 2.0.1 {C}█▓▒▒░░░{G}
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⢸⡇░░░▒▒▓█  {W}Network Device Discovery 2.2.1 {C}█▓▒▒░░░{G}
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⠘⠃░░░▒▒▓███████████████████████████████████▓▒▒░░░{G}
                     {C}▒▓█▓▒                             ▒▓█▓▒{RE}⠀⠀
             """,
-        "not_windows": f"{R}[-] {RE}Please run NDD.py on a Windows machine",
+        "not_windows": f"{R}[-] {RE}Please run network_device_discovery.py on a Windows machine",
         "scanning_arp": f"{G}Scanning for local network devices using {Y}ARP {G}...{RE}",
         "scanning_upnp": f"{G}Scanning for local network devices using {Y}UPNP {G}...{RE}",
-        "device_table_headers": f"{'ID':<6}{'Interface':<19}{'IPv4 address':<18}{'MAC address':<20}{'Vendor':<30}\n"
+        "device_table_headers": f"\n{'ID':<6}{'Interface':<19}{'IPv4 address':<18}{'MAC address':<20}{'Vendor':<30}\n"
         + f"{'---':<6}{'---------------':<19}{'---------------':<18}{'-----------------':<20}{'-----------------------':<30}",
     }
 
@@ -59,7 +59,7 @@ def print_status(code, clear_screen=False):
     print(status_switch.get(code))
 
 
-def get_arp_table():
+def get_arp_table() -> list:
     process = subprocess.Popen(
         "arp -a",
         shell=True,
@@ -73,7 +73,7 @@ def get_arp_table():
     return arp_table
 
 
-def get_upnp_locations():
+def get_upnp_locations() -> set:
     upnp_locations = set()
     ssdpDiscover = (
         "M-SEARCH * HTTP/1.1\r\n"
@@ -102,7 +102,7 @@ def get_upnp_locations():
     return upnp_locations
 
 
-def process_upnp_locations(upnp_locations):
+def process_upnp_locations(upnp_locations) -> dict:
     devices_found = {}
 
     for location in upnp_locations:
@@ -113,7 +113,7 @@ def process_upnp_locations(upnp_locations):
     return devices_found
 
 
-def process_arp_table(arp_table):
+def process_arp_table(arp_table) -> dict:
     devices_found = {}
     entry_num = 0
     interface_addr = ""
@@ -129,9 +129,8 @@ def process_arp_table(arp_table):
         if entry:
             entry_num += 1
             device_addr = re.search(regex_ip_addr, line).group(0)
-            device_mac = (
-                re.search(regex_mac_addr, line).group(0).replace("-", ":").upper()
-            )
+            device_mac = re.search(regex_mac_addr, line).group(0)
+            device_mac = device_mac.replace("-", ":").upper()
             device_vendor = lookup_mac_addr_oui(device_mac)
 
             devices_found.update(
@@ -150,7 +149,7 @@ def process_arp_table(arp_table):
     return devices_found
 
 
-def lookup_mac_addr_oui(mac_addr):
+def lookup_mac_addr_oui(mac_addr) -> str:
     # Organizationally Unique Identifier (OUI)
     # The OUI is found in the first three octets of a MAC address
     try:
@@ -162,9 +161,9 @@ def lookup_mac_addr_oui(mac_addr):
     return vendor
 
 
-def combine_devices_found(arp_devices_found, upnp_devices_found):
+def combine_devices_found(arp_devices_found, upnp_devices_found) -> dict:
     # TODO
-    # There should be a simpler way to do this
+    # Simpler implementation
     devices_found = arp_devices_found.copy()
 
     for device_addr in devices_found:
@@ -175,15 +174,15 @@ def combine_devices_found(arp_devices_found, upnp_devices_found):
     return devices_found
 
 
-def parse_xml_attribute(xml, xml_name):
+def parse_xml_attribute(xml, xml_name) -> str:
     try:
-        temp = xml.find(xml_name).text
-        return temp
+        return xml.find(xml_name).text
     except AttributeError:
         return ""
+    return ""
 
 
-def get_upnp_location_data(upnp_location):
+def get_upnp_location_data(upnp_location) -> dict:
     device_data = {}
 
     resp = requests.get(upnp_location, timeout=2)
@@ -195,27 +194,18 @@ def get_upnp_location_data(upnp_location):
     except:
         return device_data
 
-    device_data["Device Type"] = parse_xml_attribute(
-        xmlRoot, f"{xml_urn_schema}deviceType"
-    )
-    device_data["Friendly Name"] = parse_xml_attribute(
-        xmlRoot, f"{xml_urn_schema}friendlyName"
-    )
-    device_data["Manufacturer"] = parse_xml_attribute(
-        xmlRoot, f"{xml_urn_schema}manufacturer"
-    )
-    device_data["Manufacturer URL"] = parse_xml_attribute(
-        xmlRoot, f"{xml_urn_schema}manufacturerURL"
-    )
-    device_data["Model Description"] = parse_xml_attribute(
-        xmlRoot, f"{xml_urn_schema}modelDescription"
-    )
-    device_data["Model Name"] = parse_xml_attribute(
-        xmlRoot, f"{xml_urn_schema}modelName"
-    )
-    device_data["Model Number"] = parse_xml_attribute(
-        xmlRoot, f"{xml_urn_schema}modelNumber"
-    )
+    device_attr = {
+        "Device Type": "deviceType",
+        "Friendly Name": "friendlyName",
+        "Manufacturer": "manufacturer",
+        "Manufacturer URL": "manufacturerURL",
+        "Model Description": "modelDescription",
+        "Model Name": "modelName",
+        "Model Number": "modelNumber",
+    }
+
+    for key, value in device_attr.items():
+        device_data[key] = parse_xml_attribute(xmlRoot, f"{xml_urn_schema}{value}")
 
     return device_data
 

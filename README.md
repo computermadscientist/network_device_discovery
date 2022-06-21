@@ -1,7 +1,10 @@
 # Network Device Discovery
-A tool for discovering devices on the local network using ARP, UPNP.
+A Python script for discovering devices on the local network using ARP, UPNP.
 
-Currently this tool only works on Windows.
+Currently this script only works on Windows.
+
+*Code formatters: Black, isort*
+
 
 ![screenshot](https://github.com/computermadscientist/network_device_discovery/blob/main/resources/screenshot_001.png)
 
@@ -9,14 +12,15 @@ Currently this tool only works on Windows.
 
 ### Address Resolution Protocol (ARP)
 
-1. Get the current ARP cache tables for all interfaces.
+1. Retrieve the current ARP cache tables for all interfaces.
 2. Parse the ARP caches tables for individual device entries.
+3. Perform OUI lookup of device MAC address to obtain device vendor.
 
 ### Universal Plug and Play (UPNP)
 
-1. Send M-SEARCH request via Multicast UDP
-2. Receive Unicast UDP response from compatible devices
-3. Get and parse XML description file from device
+1. Send M-SEARCH request via Multicast UDP.
+2. Receive Unicast UDP response from compatible devices.
+3. Retrieve and parse the XML description file from each device to obtain device attributes.
 
 ## Installation
 
@@ -33,6 +37,6 @@ $ python -m pip install -r requirements.txt
 
 To run the script, you simply use the Python command:
 ```bash
-$ python network_device_discovery.py
+$ python discover.py
 ```
-Results will be displayed to the terminal.
+Results will be displayed to the terminal in a color coded table with some nice ascii art.
