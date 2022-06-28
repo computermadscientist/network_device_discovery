@@ -185,9 +185,12 @@ def parse_xml_attribute(xml, xml_name) -> str:
 def get_upnp_location_data(upnp_location) -> dict:
     device_data = {}
 
-    resp = requests.get(upnp_location, timeout=2)
-    if resp.headers.get("server"):
-        device_data["Server String"] = resp.headers["server"]
+    try:
+        resp = requests.get(upnp_location, timeout=2)
+        if resp.headers.get("server"):
+            device_data["Server String"] = resp.headers["server"]
+    except:
+        return device_data
 
     try:
         xmlRoot = ET.fromstring(resp.text)
