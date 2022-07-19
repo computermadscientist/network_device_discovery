@@ -5,6 +5,7 @@ Currently this script only works on Windows.
 
 *Code formatters: Black, isort*
 
+## Example Output
 
 ![screenshot](https://github.com/computermadscientist/network_device_discovery/blob/main/resources/screenshot_001.png)
 
@@ -22,12 +23,12 @@ Currently this script only works on Windows.
 2. Receive Unicast UDP response from compatible devices.
 3. Retrieve and parse the XML description file from each device to obtain device attributes.
 
-## Installation
+## Dependencies
 
 Requires Python 3.9+ installed. 
 You can download the latest version of Python 3 via the [official website](https://www.python.org/downloads/)
 
-Once Python has been installed, ensure you have the Python library dependencies installed.
+Once Python has been installed, ensure you have the Python library dependencies installed as well.
 ```bash
 $ cd .\network_device_discovery\
 $ python -m pip install -r requirements.txt
