@@ -9,13 +9,15 @@ Currently this script only works on Windows.
 
 ![screenshot](https://github.com/computermadscientist/network_device_discovery/blob/main/resources/screenshot_001.png)
 
-## Discovery Methods
+## Passive Discovery Methods
 
 ### Address Resolution Protocol (ARP)
 
 1. Retrieve the current ARP cache tables for all interfaces.
 2. Parse the ARP caches tables for individual device entries.
 3. Perform OUI lookup of device MAC address to obtain device vendor.
+
+## Active Discovery Methods
 
 ### Universal Plug and Play (UPNP)
 
