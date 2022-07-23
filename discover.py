@@ -8,6 +8,7 @@ import socket
 import subprocess
 import xml.etree.ElementTree as ET
 from pprint import pprint
+from sys import platform
 
 import requests
 from colorama import Fore
@@ -22,10 +23,12 @@ RE = Fore.RESET
 W = Fore.WHITE
 Y = Fore.YELLOW
 
-regex_arp_entry = re.compile(r"\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}\s+.{3}-.{3}")
+regex_arp_entry_windows = re.compile(r"\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}\s+.{3}-.{3}")
+regex_arp_interface_windows = re.compile(r"Interface: (.+?) ---")
+regex_arp_entry_linux = re.compile(r"\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}.*at.*on")
+regex_arp_entry_linux_interface = re.compile(r".*at.*on\s(.*)")
 regex_ip_addr = re.compile(r"(\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})")
-regex_mac_addr = re.compile(r"(.{2}-.{2}-.{2}-.{2}-.{2}-.{2})")
-regex_arp_interface = re.compile(r"Interface: (.+?) ---")
+regex_mac_addr = re.compile(r"(.{2}[-:].{2}[-:].{2}[-:].{2}[-:].{2}[-:].{2})")
 regex_upnp_location = re.compile("location:[ ]*(.+)\r\n", re.IGNORECASE)
 
 xml_urn_schema = (
@@ -47,7 +50,10 @@ def print_status(code, clear_screen=False) -> None:
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⠘⠃░░░▒▒▓███████████████████████████████████▓▒▒░░░{G}
                     {C}▒▓█▓▒                             ▒▓█▓▒{RE}⠀⠀
             """,
-        "not_windows": f"{R}[-] {RE}Please run network_device_discovery.py on a Windows machine",
+        "win32": f"{Y}Windows{G} operating system detected.{RE}",
+        "linux": f"{Y}Linux{G} operating system detected.{RE}",
+        "wsl": f"{Y}WSL{G} environment detected.{RE}",
+        "os_not_supported": f"{R}The detected operating system is not supported.{RE}",
         "scanning_arp": f"{G}Scanning for local network devices using {Y}ARP {G}...{RE}",
         "scanning_upnp": f"{G}Scanning for local network devices using {Y}UPNP {G}...{RE}",
         "device_table_headers": f"\n{'ID':<6}{'Interface':<19}{'IPv4 address':<18}{'MAC address':<20}{'Vendor':<30}\n"
@@ -60,11 +66,24 @@ def print_status(code, clear_screen=False) -> None:
 
 
 def get_arp_table() -> list:
+    command = ""
+    arp_table = []
+
+    if platform == "win32":
+        command = "arp -a"
+    elif platform == "linux":
+        command = "arp -a"
+        if "Microsoft" in os.uname().release:
+            command = "arp.exe -a"
+    else:
+        return arp_table
+
     process = subprocess.Popen(
-        "arp -a",
+        # "arp -a",
+        command,
         shell=True,
         stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
+        stdout=subprocess.PIPE, 
         stderr=subprocess.PIPE,
     )
     arp_table_output = (process.stdout.read() + process.stderr.read()).decode()
@@ -120,13 +139,18 @@ def process_arp_table(arp_table) -> dict:
 
     for line in arp_table:
 
-        interface = re.search(regex_arp_interface, line)
+        interface = re.search(regex_arp_interface_windows, line)
         if interface:
             interface_addr = interface.group(1)
             continue
 
-        entry = re.search(regex_arp_entry, line)
-        if entry:
+        windows_entry = re.search(regex_arp_entry_windows, line)
+        linux_entry = re.search(regex_arp_entry_linux, line)
+
+        if linux_entry:
+            interface_addr = re.search(regex_arp_entry_linux_interface, line).group(1)
+
+        if windows_entry or linux_entry:
             entry_num += 1
             device_addr = re.search(regex_ip_addr, line).group(0)
             device_mac = re.search(regex_mac_addr, line).group(0)
@@ -212,30 +236,39 @@ def get_upnp_location_data(upnp_location) -> dict:
 
     return device_data
 
+def check_operating_system() -> str:
+    if platform == "win32":
+        print_status("win32")
+        ctypes.windll.kernel32.SetConsoleTitleW("Network Device Discovery")
+    elif platform == "linux":
+        print_status("linux")
+        if "Microsoft" in os.uname().release:
+            print_status("wsl")
+    else:
+        print_status("os_not_supported")
+        return ""
+
+    return platform
 
 def main():
     colorama_init(convert=True)
 
-    if os.name != "nt":
-        print_status("not_windows")
+    print_status("banner", clear_screen=True)
+
+    supported = check_operating_system()
+    if not supported:
         return
 
-    ctypes.windll.kernel32.SetConsoleTitleW("Network Device Discovery")
-
-    print_status("banner", clear_screen=True)
     print_status("scanning_arp")
-
     arp_table = get_arp_table()
     arp_devices_found = process_arp_table(arp_table)
 
     print_status("scanning_upnp")
-
     upnp_locations = get_upnp_locations()
     upnp_devices_found = process_upnp_locations(upnp_locations)
 
     devices_found = combine_devices_found(arp_devices_found, upnp_devices_found)
 
-    # print_status("banner", clear_screen=True)
     print_status("device_table_headers")
 
     # TODO
