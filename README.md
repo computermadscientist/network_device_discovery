@@ -1,7 +1,7 @@
 # Network Device Discovery
 A Python script for discovering devices on the local network using ARP, UPNP.
 
-Currently this script only works on Windows.
+Currently this script works for Windows, WSL and Linux.
 
 *Code formatters: Black, isort*
 
@@ -36,6 +36,12 @@ $ cd .\network_device_discovery\
 $ python -m pip install -r requirements.txt
 ```
 
+On Linux Arp may need to be installed as part of the net-tools package
+
+```bash
+sudo apt-get install net-tools
+```
+
 ## Usage
 
 To run the script, you simply use the Python command:
@@ -43,3 +49,5 @@ To run the script, you simply use the Python command:
 $ python discover.py
 ```
 Results will be displayed to the terminal in a color coded table with some nice ascii art.
+
+*Note*: If using this script inside a VM, try the VM network connection as Bridged (Connected directly to the physical network) and not NAT (Sharing the host's IP address). Otherwise some of the discovery methods relying on sockets may not work.

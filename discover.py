@@ -23,8 +23,8 @@ RE = Fore.RESET
 W = Fore.WHITE
 Y = Fore.YELLOW
 
+regex_arp_windows_interface = re.compile(r"Interface: (.+?) ---")
 regex_arp_entry_windows = re.compile(r"\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}\s+.{3}-.{3}")
-regex_arp_interface_windows = re.compile(r"Interface: (.+?) ---")
 regex_arp_entry_linux = re.compile(r"\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}.*at.*on")
 regex_arp_entry_linux_interface = re.compile(r".*at.*on\s(.*)")
 regex_ip_addr = re.compile(r"(\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})")
@@ -46,7 +46,7 @@ def print_status(code, clear_screen=False) -> None:
 ⠀⠀⠀⠀⠀⠀⠀⠀⠈⢿⣄⠘⠃⠀{C}⢸⡇{G}⠀⠘⠁⣰⡟⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠃⠀⠀{C}⢸⡇{G}⠀⠀⠘⠋⠀⠀⠀ 
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⢸⡇░░░▒▒▓██████████████████████████{G}█{C}█{G}█{C}█{Y}█{C}█{G}█{C}██▓▒▒░░░{G}
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⢸⡇░░░▒▒▓█  {W}Network Device Discovery 2.2.1 {C}█▓▒▒░░░{G}
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⢸⡇░░░▒▒▓█  {W}Network Device Discovery 3.0.1 {C}█▓▒▒░░░{G}
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⠘⠃░░░▒▒▓███████████████████████████████████▓▒▒░░░{G}
                     {C}▒▓█▓▒                             ▒▓█▓▒{RE}⠀⠀
             """,
@@ -58,6 +58,8 @@ def print_status(code, clear_screen=False) -> None:
         "scanning_upnp": f"{G}Scanning for local network devices using {Y}UPNP {G}...{RE}",
         "device_table_headers": f"\n{'ID':<6}{'Interface':<19}{'IPv4 address':<18}{'MAC address':<20}{'Vendor':<30}\n"
         + f"{'---':<6}{'---------------':<19}{'---------------':<18}{'-----------------':<20}{'-----------------------':<30}",
+        "upnp_socket_error": f"{R}Error: No data received from socket when performing UPNP broadcast \n"
+        + f"{Y}If you are running this script in a VM, try changing the network connection to Bridged.{RE}",
     }
 
     if clear_screen:
@@ -83,7 +85,7 @@ def get_arp_table() -> list:
         command,
         shell=True,
         stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE, 
+        stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
     arp_table_output = (process.stdout.read() + process.stderr.read()).decode()
@@ -116,6 +118,7 @@ def get_upnp_locations() -> set:
             ):
                 upnp_locations.add(location_result.group(1))
     except socket.error:
+        print_status("upnp_socket_error")
         sock.close()
 
     return upnp_locations
@@ -139,7 +142,7 @@ def process_arp_table(arp_table) -> dict:
 
     for line in arp_table:
 
-        interface = re.search(regex_arp_interface_windows, line)
+        interface = re.search(regex_arp_windows_interface, line)
         if interface:
             interface_addr = interface.group(1)
             continue
@@ -177,7 +180,9 @@ def lookup_mac_addr_oui(mac_addr) -> str:
     # Organizationally Unique Identifier (OUI)
     # The OUI is found in the first three octets of a MAC address
     try:
-        oui_info = json.loads(requests.get("http://macvendors.co/api/" + mac_addr).text)
+        oui_info = json.loads(
+            requests.get("http://macvendors.co/api/" + mac_addr).text, timeout=3
+        )
         vendor = oui_info["result"]["company"]
     except:
         vendor = f"{R}-- unknown --{RE}"
@@ -236,6 +241,7 @@ def get_upnp_location_data(upnp_location) -> dict:
 
     return device_data
 
+
 def check_operating_system() -> str:
     if platform == "win32":
         print_status("win32")
@@ -250,9 +256,8 @@ def check_operating_system() -> str:
 
     return platform
 
-def main():
-    colorama_init(convert=True)
 
+def main():
     print_status("banner", clear_screen=True)
 
     supported = check_operating_system()
@@ -296,4 +301,5 @@ def main():
 
 
 if __name__ == "__main__":
+    colorama_init(convert=True)
     main()
