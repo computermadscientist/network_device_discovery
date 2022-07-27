@@ -50,4 +50,6 @@ $ python discover.py
 ```
 Results will be displayed to the terminal in a color coded table with some nice ascii art.
 
-*Note*: If using this script inside a VM, try the VM network connection as Bridged (Connected directly to the physical network) and not NAT (Sharing the host's IP address). Otherwise some of the discovery methods relying on sockets may not work.
+*Note*: 
+
+Although this script can be used inside a VM, the results may be limited, depending on how your VM is networked. Try the VM network connection as Bridged (Connected directly to the physical network) and not NAT (Sharing the host's IP address). Otherwise some of the discovery methods relying on sockets may not work.

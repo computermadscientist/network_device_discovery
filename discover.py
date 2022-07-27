@@ -26,7 +26,7 @@ Y = Fore.YELLOW
 regex_arp_windows_interface = re.compile(r"Interface: (.+?) ---")
 regex_arp_entry_windows = re.compile(r"\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}\s+.{3}-.{3}")
 regex_arp_entry_linux = re.compile(r"\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}.*at.*on")
-regex_arp_entry_linux_interface = re.compile(r".*at.*on\s(.*)")
+regex_arp_entry_linux_interface = re.compile(r".*at.*on\s(\S*)\s?")
 regex_ip_addr = re.compile(r"(\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})")
 regex_mac_addr = re.compile(r"(.{2}[-:].{2}[-:].{2}[-:].{2}[-:].{2}[-:].{2})")
 regex_upnp_location = re.compile("location:[ ]*(.+)\r\n", re.IGNORECASE)
@@ -46,7 +46,7 @@ def print_status(code, clear_screen=False) -> None:
 ⠀⠀⠀⠀⠀⠀⠀⠀⠈⢿⣄⠘⠃⠀{C}⢸⡇{G}⠀⠘⠁⣰⡟⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠃⠀⠀{C}⢸⡇{G}⠀⠀⠘⠋⠀⠀⠀ 
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⢸⡇░░░▒▒▓██████████████████████████{G}█{C}█{G}█{C}█{Y}█{C}█{G}█{C}██▓▒▒░░░{G}
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⢸⡇░░░▒▒▓█  {W}Network Device Discovery 3.0.1 {C}█▓▒▒░░░{G}
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⢸⡇░░░▒▒▓█  {W}Network Device Discovery 3.0.2 {C}█▓▒▒░░░{G}
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{C}⠘⠃░░░▒▒▓███████████████████████████████████▓▒▒░░░{G}
                     {C}▒▓█▓▒                             ▒▓█▓▒{RE}⠀⠀
             """,
@@ -181,7 +181,7 @@ def lookup_mac_addr_oui(mac_addr) -> str:
     # The OUI is found in the first three octets of a MAC address
     try:
         oui_info = json.loads(
-            requests.get("http://macvendors.co/api/" + mac_addr).text, timeout=3
+            requests.get(f"http://macvendors.co/api/{mac_addr}", timeout=5).text
         )
         vendor = oui_info["result"]["company"]
     except:
@@ -242,6 +242,31 @@ def get_upnp_location_data(upnp_location) -> dict:
     return device_data
 
 
+def print_discovery_results(devices_found) -> None:
+    # TODO
+    # Clean-up
+    # Determine better layout as more info is added
+    for device in devices_found.values():
+
+        print(
+            f'{C}{device["num"]:<6}{W}{device["interface"]:<19}{C}{device["address"]:<18}{Y}{device["mac"]:<20}{G}{device["vendor"]:<30}'
+        )
+
+        already_printed = False
+
+        if device["upnp_locations"]:
+            print(f'{" "*63}{W}UPNP Locations')
+            print(f'{" "*63}{W}------------------------')
+            print(f'{" "*63}{M}{", ".join(device["upnp_locations"])}')
+
+            for location in device["upnp_locations"]:
+                upnp_data = get_upnp_location_data(location)
+                if upnp_data and not already_printed:
+                    for key, value in upnp_data.items():
+                        print(f"{M}{key:>61}: {G}{value}")
+                        already_printed = True
+
+
 def check_operating_system() -> str:
     if platform == "win32":
         print_status("win32")
@@ -260,8 +285,8 @@ def check_operating_system() -> str:
 def main():
     print_status("banner", clear_screen=True)
 
-    supported = check_operating_system()
-    if not supported:
+    supported_os = check_operating_system()
+    if not supported_os:
         return
 
     print_status("scanning_arp")
@@ -275,29 +300,7 @@ def main():
     devices_found = combine_devices_found(arp_devices_found, upnp_devices_found)
 
     print_status("device_table_headers")
-
-    # TODO
-    # Clean-up
-    # Determine better layout as more info is added
-    for device in devices_found.values():
-
-        print(
-            f'{C}{device["num"]:<6}{W}{device["interface"]:<19}{C}{device["address"]:<18}{Y}{device["mac"]:<20}{G}{device["vendor"]:<30}'
-        )
-
-        already_printed = False
-
-        if device["upnp_locations"]:
-            print(f'{" "*63}{W}UPNP Locations')
-            print(f'{" "*63}{W}------------------------')
-            print(f'{" "*63}{M}{", ".join(device["upnp_locations"])}')
-
-            for l in device["upnp_locations"]:
-                upnp_data = get_upnp_location_data(l)
-                if upnp_data and not already_printed:
-                    for key, value in upnp_data.items():
-                        print(f"{M}{key:>61}: {G}{value}")
-                        already_printed = True
+    print_discovery_results(devices_found)
 
 
 if __name__ == "__main__":
