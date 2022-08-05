@@ -30,13 +30,13 @@ Currently this script works for Windows, WSL and Linux.
 Requires Python 3.9+ installed. 
 You can download the latest version of Python 3 via the [official website](https://www.python.org/downloads/)
 
-Once Python has been installed, ensure you have the Python library dependencies installed as well.
+Once Python has been installed, ensure you have the Python library dependencies installed as well:
 ```bash
 $ cd .\network_device_discovery\
 $ python -m pip install -r requirements.txt
 ```
 
-On Linux Arp may need to be installed as part of the net-tools package
+On Linux the ARP utility may need to be installed as part of the net-tools package:
 
 ```bash
 sudo apt-get install net-tools
