@@ -179,13 +179,38 @@ def process_arp_table(arp_table) -> dict:
 def lookup_mac_addr_oui(mac_addr) -> str:
     # Organizationally Unique Identifier (OUI)
     # The OUI is found in the first three octets of a MAC address
+    vendor = None
+
     try:
         oui_info = json.loads(
             requests.get(f"http://macvendors.co/api/{mac_addr}", timeout=5).text
         )
         vendor = oui_info["result"]["company"]
     except:
+        pass
+
+    if not vendor:
+        match = None
+        with open("wireshark_manufacturer_database.txt") as f:
+            lines = [line for line in f if line.strip() and not line.startswith("#")]
+
+        # Try matching on full 6 octets
+        for l in lines:
+            if l.startswith(mac_addr):
+                match = l
+                break
+
+        # Try matching on first 3 octets
+        if not match:
+            for j in lines:
+                if j.startswith(mac_addr[:8]):
+                    match = j
+                    break
+
         vendor = f"{R}-- unknown --{RE}"
+        if match:
+            _, ven, *ven2 = match.strip().split("\t")
+            vendor = ven2[0] if ven2 else ven
 
     return vendor
 
